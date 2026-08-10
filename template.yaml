@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  chat agent
+
+  SAM Template for chat agent
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 180
+    MemorySize: 256
+
+Parameters:
+  Env:
+    Type: String
+    Default: local
+    AllowedValues:
+      - local
+      - prod
+  SlackOAuthToken:
+    Type: String
+    Description: Slack OAuth token
+    Default: ""
+    NoEcho: true
+  SlackChannelID:
+    Type: String
+    Description: Slack channel ID
+    Default: ""
+    NoEcho: true
+  SlackSigningSecret:
+    Type: String
+    Description: Slack signing secret
+    Default: ""
+    NoEcho: true
+
+Resources:
+  ChatAgentFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      FunctionName: chatagent-ChatAgentFunction
+      CodeUri: ./src/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+      - x86_64
+      Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
+        Variables:
+         APP_ENV: !Ref Env
+         SLACK_OAUTH_TOKEN: !Ref SlackOAuthToken
+         SLACK_CHANNEL_ID: !Ref SlackChannelID
+         SLACK_SIGNING_SECRET: !Ref SlackSigningSecret
+      Events:
+        SlackEvents:
+          Type: Api
+          Properties:
+            Path: /slack/events
+            Method: post
+
+  ChatAgentFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ChatAgentFunction}
+      RetentionInDays: 3
