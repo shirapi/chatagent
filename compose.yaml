@@ -12,6 +12,25 @@ services:
       - type: bind
         source: .
         target: /workspace
+    working_dir: /workspace/src
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+  agent:
+    build:
+      context: .
+      dockerfile: ./.devcontainer/Dockerfile.agent
+    environment:
+      - AWS_DEFAULT_REGION=ap-northeast-1
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+    volumes:
+      - type: bind
+        source: .
+        target: /workspace
+    working_dir: /workspace/agent/app/chatagent
     stdin_open: true
     tty: true
     command: /bin/bash
