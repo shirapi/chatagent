@@ -33,8 +33,55 @@ Parameters:
     Description: Slack signing secret
     Default: ""
     NoEcho: true
+  SlackReactionName:
+    Type: String
+    Description: Reaction name to add while processing
+    Default: "eyes"
 
 Resources:
+  # API Gateway
+  ApiGatewayCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
+
+  ChatAgentApi:
+    Type: AWS::Serverless::Api
+    DependsOn: ApiGatewayAccount
+    Properties:
+      StageName: Prod
+      AccessLogSetting:
+        DestinationArn: !GetAtt ChatAgentApiAccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","integrationStatus":"$context.integrationStatus","integrationErrorMessage":"$context.integrationErrorMessage"}'
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          LoggingLevel: INFO
+          DataTraceEnabled: true
+          MetricsEnabled: true
+
+  ChatAgentApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: /aws/apigateway/chatagent
+      RetentionInDays: 3
+
+  # Lambda Function
   ChatAgentFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Metadata:
@@ -52,10 +99,12 @@ Resources:
          SLACK_OAUTH_TOKEN: !Ref SlackOAuthToken
          SLACK_CHANNEL_ID: !Ref SlackChannelID
          SLACK_SIGNING_SECRET: !Ref SlackSigningSecret
+         SLACK_REACTION_NAME: !Ref SlackReactionName
       Events:
         SlackEvents:
           Type: Api
           Properties:
+            RestApiId: !Ref ChatAgentApi
             Path: /slack/events
             Method: post
 

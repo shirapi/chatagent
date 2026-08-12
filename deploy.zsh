@@ -22,12 +22,17 @@ while [[ -z "$SlackSigningSecret" ]]; do
 done
 SlackSigningSecret=${SlackSigningSecret//$'\n'/}
 
+SlackReactionName="eyes"
+vared -p "SlackReactionName (default: eyes): " -c SlackReactionName
+SlackReactionName=${SlackReactionName//$'\n'/}
+
 echo " "
 echo "=== deploy info ==="
 echo " "
 echo "SlackOAuthToken: $SlackOAuthToken"
 echo "SlackChannelId: $SlackChannelId"
 echo "SlackSigningSecret: $SlackSigningSecret"
+echo "SlackReactionName: $SlackReactionName"
 echo " "
 echo "=== deploy info ==="
 echo " "
@@ -39,7 +44,7 @@ case "$yn" in [yY]*) ;; *) echo "abort." ; exit ;; esac
 # deploy
 sam build && sam deploy --stack-name "chatagent" \
     --config-env "prod" \
-    --parameter-overrides Env=prod SlackOAuthToken=${SlackOAuthToken} SlackChannelID=${SlackChannelId} SlackSigningSecret=${SlackSigningSecret}
+    --parameter-overrides Env=prod SlackOAuthToken=${SlackOAuthToken} SlackChannelID=${SlackChannelId} SlackSigningSecret=${SlackSigningSecret} SlackReactionName=${SlackReactionName}
 # watch
 # sam sync --stack-name chatagent --watch
 # delete
