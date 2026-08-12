@@ -37,6 +37,10 @@ Parameters:
     Type: String
     Description: Reaction name to add while processing
     Default: "eyes"
+  AgentCoreRuntimeArn:
+    Type: String
+    Description: Bedrock AgentCore Runtime ARN to invoke
+    Default: ""
 
 Resources:
   # API Gateway
@@ -100,6 +104,17 @@ Resources:
          SLACK_CHANNEL_ID: !Ref SlackChannelID
          SLACK_SIGNING_SECRET: !Ref SlackSigningSecret
          SLACK_REACTION_NAME: !Ref SlackReactionName
+         AGENTCORE_RUNTIME_ARN: !Ref AgentCoreRuntimeArn
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock-agentcore:InvokeAgentRuntime
+                - bedrock-agentcore:InvokeAgentRuntimeForUser
+                - bedrock-agentcore:GetAgentRuntime
+              Resource:
+                - !Ref AgentCoreRuntimeArn
+                - !Sub "${AgentCoreRuntimeArn}/*"
       Events:
         SlackEvents:
           Type: Api

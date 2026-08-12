@@ -26,6 +26,12 @@ SlackReactionName="eyes"
 vared -p "SlackReactionName (default: eyes): " -c SlackReactionName
 SlackReactionName=${SlackReactionName//$'\n'/}
 
+AgentCoreRuntimeArn=""
+while [[ -z "$AgentCoreRuntimeArn" ]]; do
+    vared -p "AgentCoreRuntimeArn: " -c AgentCoreRuntimeArn
+done
+AgentCoreRuntimeArn=${AgentCoreRuntimeArn//$'\n'/}
+
 echo " "
 echo "=== deploy info ==="
 echo " "
@@ -33,6 +39,7 @@ echo "SlackOAuthToken: $SlackOAuthToken"
 echo "SlackChannelId: $SlackChannelId"
 echo "SlackSigningSecret: $SlackSigningSecret"
 echo "SlackReactionName: $SlackReactionName"
+echo "AgentCoreRuntimeArn: $AgentCoreRuntimeArn"
 echo " "
 echo "=== deploy info ==="
 echo " "
@@ -44,7 +51,7 @@ case "$yn" in [yY]*) ;; *) echo "abort." ; exit ;; esac
 # deploy
 sam build && sam deploy --stack-name "chatagent" \
     --config-env "prod" \
-    --parameter-overrides Env=prod SlackOAuthToken=${SlackOAuthToken} SlackChannelID=${SlackChannelId} SlackSigningSecret=${SlackSigningSecret} SlackReactionName=${SlackReactionName}
+    --parameter-overrides Env=prod SlackOAuthToken=${SlackOAuthToken} SlackChannelID=${SlackChannelId} SlackSigningSecret=${SlackSigningSecret} SlackReactionName=${SlackReactionName} AgentCoreRuntimeArn=${AgentCoreRuntimeArn}
 # watch
 # sam sync --stack-name chatagent --watch
 # delete
