@@ -15,10 +15,14 @@ func GetSlackOAuthToken() string {
 	return os.Getenv("SLACK_OAUTH_TOKEN")
 }
 
-func GetStackChannelID() string {
+func GetSlackChannelID() string {
 	return os.Getenv("SLACK_CHANNEL_ID")
 }
 
 func GetSlackSigningSecret() string {
 	return os.Getenv("SLACK_SIGNING_SECRET")
+}
+
+func GetSlackReactionName() string {
+	return os.Getenv("SLACK_REACTION_NAME")
 }

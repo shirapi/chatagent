@@ -8,8 +8,7 @@ description: Goコード（src/以下）に対して goimports によるフォ�
 以下のコマンドを、devcontainer（`docker compose exec app`）内で実行するだけ。それ以外は何もしない。
 
 ```sh
-docker compose exec -w /workspace/src app goimports -w .
-docker compose exec -w /workspace/src app staticcheck ./...
+docker compose exec -w /workspace/src app goimports -w . && docker compose exec -w /workspace/src app staticcheck ./...
 ```
 
 - 許可を求めない。確認しない。追加の調査（git status等）もしない。

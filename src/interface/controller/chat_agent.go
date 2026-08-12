@@ -24,14 +24,18 @@ func NewChatAgent(appEnv string, uc interactor.ChatAgent) *ChatAgent {
 }
 
 func (ctrl *ChatAgent) Exec(ctx context.Context, r *http.Request) (*Response, error) {
-	challenge, err := ctrl.Usecase.Verify(r)
+	result, err := ctrl.Usecase.Verify(r)
 	if err != nil {
 		return &Response{StatusCode: http.StatusUnauthorized}, nil
 	}
-	if challenge != "" {
-		return &Response{StatusCode: http.StatusOK, Body: challenge}, nil
+	if result.Challenge != "" {
+		return &Response{StatusCode: http.StatusOK, Body: result.Challenge}, nil
+	}
+	if result.Mention != nil {
+		if err := ctrl.Usecase.Exec(ctx, *result.Mention); err != nil {
+			return &Response{StatusCode: http.StatusInternalServerError}, nil
+		}
 	}
 
-	// TODO ユースケースの呼び出し
 	return &Response{StatusCode: http.StatusOK}, nil
 }

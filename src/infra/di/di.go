@@ -11,7 +11,7 @@ import (
 
 func NewController(ctx context.Context) (*controller.ChatAgent, error) {
 	agentRepo := infra.NewChatAgentRepository()
-	slackRepo := notification.NewSlack(env.GetSlackOAuthToken(), env.GetStackChannelID(), env.GetSlackSigningSecret())
-	uc := usecase.NewChatAgent(agentRepo, slackRepo)
+	slackRepo := notification.NewSlack(env.GetSlackOAuthToken(), env.GetSlackSigningSecret())
+	uc := usecase.NewChatAgent(agentRepo, slackRepo, env.GetSlackChannelID(), env.GetSlackReactionName())
 	return controller.NewChatAgent(env.GetAppEnv(), uc), nil
 }

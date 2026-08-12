@@ -15,6 +15,6 @@ settings.local.json
 deploy_*.zsh
 
 ### Tmp ###
-doc/*
+docs/*
 cfn/*
 buildspec.yaml
