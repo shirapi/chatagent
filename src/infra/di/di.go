@@ -4,14 +4,17 @@ import (
 	"chatagent/domain/env"
 	"chatagent/infra"
 	"chatagent/infra/notification"
-	"chatagent/interactor/usecase"
 	"chatagent/interface/controller"
+	"chatagent/usecase/interactor"
 	"context"
 )
 
 func NewController(ctx context.Context) (*controller.ChatAgent, error) {
-	agentRepo := infra.NewChatAgentRepository()
+	agentRepo, err := infra.NewChatAgentRepository(ctx, env.GetAgentCoreRuntimeArn())
+	if err != nil {
+		return nil, err
+	}
 	slackRepo := notification.NewSlack(env.GetSlackOAuthToken(), env.GetSlackSigningSecret())
-	uc := usecase.NewChatAgent(agentRepo, slackRepo, env.GetSlackChannelID(), env.GetSlackReactionName())
+	uc := interactor.NewChatAgent(agentRepo, slackRepo, env.GetSlackChannelID(), env.GetSlackReactionName())
 	return controller.NewChatAgent(env.GetAppEnv(), uc), nil
 }

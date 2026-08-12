@@ -6,7 +6,7 @@ import (
 )
 
 type ChatAgentRepository interface {
-	Call(ctx context.Context, msg string) error // TODO レスポンス型定義
+	Call(ctx context.Context, sessionID, message string) (string, error)
 }
 
 type NotificationTarget struct {

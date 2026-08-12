@@ -26,3 +26,7 @@ func GetSlackSigningSecret() string {
 func GetSlackReactionName() string {
 	return os.Getenv("SLACK_REACTION_NAME")
 }
+
+func GetAgentCoreRuntimeArn() string {
+	return os.Getenv("AGENTCORE_RUNTIME_ARN")
+}
