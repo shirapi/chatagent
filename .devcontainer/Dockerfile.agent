@@ -1,0 +1,6 @@
+FROM python:3.14-slim
+
+ENV UV_INSTALL_DIR=/usr/local/bin
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
