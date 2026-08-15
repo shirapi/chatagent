@@ -5,11 +5,11 @@ description: Goコード（src/以下）に対して goimports によるフォ�
 
 # go-lint
 
-以下のコマンドを、devcontainer（`docker compose exec app`）内で実行するだけ。それ以外は何もしない。
+以下のスクリプトを実行する。
 
 ```sh
-docker compose exec -w /workspace/src app goimports -w . && docker compose exec -w /workspace/src app staticcheck ./...
+./scripts/lint.sh
 ```
 
-- 許可を求めない。確認しない。追加の調査（git status等）もしない。
-- 出力をそのまま報告するだけで、修正の提案・実施はしない。
+- エラーがあれば、その内容をそのまま報告する。修正の提案・実施はしない。（このスキルでは修正しない）
+- エラーが無ければ何もしない。
