@@ -1,0 +1,47 @@
+{
+  "respectGitignore": true,
+  "permissions": {
+    "allow": [
+        "Bash(./scripts/lint.sh)"
+    ],
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(ssh *)",
+      "Bash(docker system prune *)",
+      "Bash(git branch -D *)",
+      "Bash(git clean *)",
+      "Bash(git push *)",
+      "Bash(git reset --hard *)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/.aws/*)",
+      "Read(**/.ssh/*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.p12)",
+      "Read(**/*.pfx)",
+      "Read(**/*.secret)",
+      "Read(**/config/credentials.json)",
+      "Read(**/build)"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(aws *)",
+      "Bash(docker compose down *)",
+      "Bash(git add *)",
+      "Bash(git stash drop *)",
+      "Bash(git stash clear *)",
+      "WebFetch"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "input=$(cat); branch=$(cd \"$(echo \"$input\" | jq -r '.workspace.current_dir')\" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null); user=$(whoami); dir=$(basename \"$(ec    ho \"$input\" | jq -r '.workspace.current_dir')\"); [ -n \"$branch\" ] && printf \"%s %s [%s]\" \"$user\" \"$dir\" \"$branch\" || printf \"%s %s\" \"$user\" \"$dir\""
+  },
+  "language": "japanese",
+  "effortLevel": "medium",
+  "tui": "fullscreen",
+  "theme": "auto"
+}
