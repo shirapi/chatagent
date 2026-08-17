@@ -108,13 +108,17 @@ type NotificationRepository interface {
 
 ### main.py の役割
 
-- SSM Parameter Store からキャラクター定義（システムプロンプト）とモデルIDを読み込む（詳細は「キャラクター定義の外部管理」を参照）
+- SSM Parameter Store からキャラクター定義（システムプロンプト）とモデルIDを読み込む（詳細は「設定値の外部管理」を参照）
 - Webサーチスキルの設定
 - デプロイはAgentCore公式のCLIツール（`agentcore create` でプロジェクト生成、`agentcore deploy` でAWSへデプロイ）を使う。CloudFormationを直接書く方式ではなく、CLIが内部でCDKを生成・実行する
 
 ### Webサーチスキルについて
 
-まず Strands 組み込みの `web_search` ツールで実装し、必要に応じて Brave Search / Tavily 等のMCPサーバーに切り替える。
+`strands-agents-tools` の `tavily_search` を使う（`TAVILY_API_KEY`が必要）。
+
+APIキーは、システムプロンプト・モデルIDと同じ方式（SSM Parameter Storeからコンテナ起動時に1回読み込み）で取得し、`TAVILY_API_KEY`環境変数として設定する。
+
+> APIキーのような実際の機密値は、本来はAWS Secrets Managerで管理すべきである。Secrets Managerは有料（シークレットごとに月額課金）なため、コストの都合上SSM Parameter Storeに寄せている。今後の検討事項とする。
 
 ### セッション（会話履歴）の管理
 
@@ -126,19 +130,20 @@ AgentCore Runtimeのセッションは `(RuntimeSessionId, RuntimeUserId)` の�
 
 ---
 
-## キャラクター定義の外部管理
+## 設定値の外部管理
 
 ### 方針
 
-キャラクター定義（システムプロンプト）・モデルIDはコードに埋め込まず、**AWS Systems Manager Parameter Store** で管理する。
+キャラクター定義（システムプロンプト）・モデルID・APIキー（Tavily等）はコードに埋め込まず、**AWS Systems Manager Parameter Store** で管理する。
 
 ```
 SSM パス:
   /chatagent/AgentCharacter  # システムプロンプト
   /chatagent/AgentModelId    # BedrockモデルID
+  /chatagent/TavilyApiKey    # Tavily APIキー（本来はSecretsManagerで管理するのが良い）
 ```
 
-- AWSコンソールからパラメーターを編集するだけでキャラクター・モデルを変更できる
+- AWSコンソールからパラメーターを編集するだけで変更できる
 - 読み込みはコンテナ起動時（モジュールレベル）に1回のみ。パラメータを変更しても、次にコンテナが再起動する（アイドルタイムアウトまたは再デプロイ）まで反映されない
 - パラメータ自体はCloudFormation化せず、手動でSSMに作成する。`AWS::SSM::Parameter`は`SecureString`を作成できないというCFNの制約があり、機密値を扱う他のパラメータ運用と統一する
 
