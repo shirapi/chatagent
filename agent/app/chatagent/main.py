@@ -1,3 +1,4 @@
+import os
 from typing import Any
 from collections import OrderedDict
 from strands import Agent, tool
@@ -6,6 +7,7 @@ import boto3
 from botocore.exceptions import ClientError
 from strands.agent.conversation_manager.null_conversation_manager import NullConversationManager
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
+from strands_tools.tavily import tavily_search
 from model.load import load_model
 from mcp_client.client import get_streamable_http_mcp_client
 from memory.session import get_memory_session_manager
@@ -33,8 +35,20 @@ def _load_system_prompt() -> str:
 SYSTEM_PROMPT = _load_system_prompt()
 
 
+def _load_tavily_api_key() -> str | None:
+    try:
+        ssm = boto3.client("ssm")
+        return ssm.get_parameter(Name="/chatagent/TavilyApiKey")["Parameter"]["Value"]
+    except ClientError:
+        return None
+
+
+if tavily_api_key := _load_tavily_api_key():
+    os.environ["TAVILY_API_KEY"] = tavily_api_key
+
+
 # Define a collection of tools used by the model
-tools = []
+tools = [tavily_search]
 
 _INLINE_FUNCTION_NAMES = set()
 
