@@ -15,9 +15,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockagentcore"
 )
 
-// runtimeActorID はAgentCore Runtimeの RuntimeUserId。
-// SessionIDがスレッドごとに一意なので、ActorIDは固定値でよい。
-const runtimeActorID = "conversation-thread"
+const (
+	// runtimeActorID はAgentCore Runtimeの RuntimeUserId。
+	// SessionIDがスレッドごとに一意なので、ActorIDは固定値でよい。
+	runtimeActorID = "conversation-thread"
+
+	// minRuntimeSessionIDLength はAgentCoreのRuntimeSessionIdの最小文字数制約。
+	minRuntimeSessionIDLength = 33
+
+	// runtimeSessionIDPrefix はSlackのタイムスタンプ等をRuntimeSessionIdへ変換する際に付与するプレフィックス。
+	runtimeSessionIDPrefix = "chatagent-session-"
+)
 
 type ChatAgentRepository struct {
 	client          *bedrockagentcore.Client
@@ -64,8 +72,8 @@ func (rep *ChatAgentRepository) Call(ctx context.Context, sessionID, message str
 // toRuntimeSessionID はSlackのスレッドタイムスタンプ等をAgentCoreの
 // RuntimeSessionId要件（33文字以上、[a-zA-Z0-9][a-zA-Z0-9-_]*）に変換する。
 func toRuntimeSessionID(sessionID string) string {
-	id := "chatagent-session-" + strings.ReplaceAll(sessionID, ".", "-")
-	for len(id) < 33 {
+	id := runtimeSessionIDPrefix + strings.ReplaceAll(sessionID, ".", "-")
+	for len(id) < minRuntimeSessionIDLength {
 		id += "-"
 	}
 	return id
