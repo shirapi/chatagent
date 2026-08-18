@@ -31,3 +31,21 @@ jobs:
 
       - name: staticcheck
         run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent/app/chatagent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+
+      - name: install dependencies
+        run: uv sync --all-groups
+
+      - name: pytest
+        run: uv run pytest
