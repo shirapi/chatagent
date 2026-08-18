@@ -1,10 +1,10 @@
 import os
 from typing import Any
 from collections import OrderedDict
-from strands import Agent, tool
+from strands import Agent
 import asyncio
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 from strands.agent.conversation_manager.null_conversation_manager import NullConversationManager
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from strands_tools.tavily import tavily_search
@@ -28,7 +28,7 @@ def _load_system_prompt() -> str:
     try:
         ssm = boto3.client("ssm")
         return ssm.get_parameter(Name="/chatagent/AgentCharacter")["Parameter"]["Value"]
-    except ClientError:
+    except (ClientError, BotoCoreError):
         return DEFAULT_SYSTEM_PROMPT
 
 
@@ -39,7 +39,7 @@ def _load_tavily_api_key() -> str | None:
     try:
         ssm = boto3.client("ssm")
         return ssm.get_parameter(Name="/chatagent/TavilyApiKey")["Parameter"]["Value"]
-    except ClientError:
+    except (ClientError, BotoCoreError):
         return None
 
 
@@ -51,15 +51,6 @@ if tavily_api_key := _load_tavily_api_key():
 tools = [tavily_search]
 
 _INLINE_FUNCTION_NAMES = set()
-
-# Define a simple function tool
-@tool
-def add_numbers(a: int, b: int) -> int:
-    """Return the sum of two numbers"""
-    return a+b
-tools.append(add_numbers)
-
-
 
 # Add MCP client to tools if available
 for mcp_client in mcp_clients:

@@ -17,5 +17,10 @@ dependencies = [
     "strands-agents-tools",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["."]
