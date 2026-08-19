@@ -1,6 +1,5 @@
 import os
 from typing import Any
-from collections import OrderedDict
 from strands import Agent
 import asyncio
 import boto3
@@ -49,8 +48,6 @@ if tavily_api_key := _load_tavily_api_key():
 
 # Define a collection of tools used by the model
 tools = [tavily_search]
-
-_INLINE_FUNCTION_NAMES = set()
 
 # Add MCP client to tools if available
 for mcp_client in mcp_clients:
@@ -128,29 +125,6 @@ def _extract_prompt(payload: dict):
     if not isinstance(prompt, str):
         raise ValueError("prompt must be a string")
     return prompt
-
-
-def _has_inline_function_call(messages) -> bool:
-    """Return True if messages contains an assistant toolUse for an inline function tool."""
-    if not _INLINE_FUNCTION_NAMES or not isinstance(messages, list):
-        return False
-    for msg in messages:
-        if msg.get("role") == "assistant":
-            for block in msg.get("content", []):
-                if isinstance(block, dict) and block.get("toolUse", {}).get("name") in _INLINE_FUNCTION_NAMES:
-                    return True
-    return False
-
-
-def _is_inline_function_call(event: dict) -> bool:
-    """Check if a contentBlockStart event is for an inline function tool."""
-    if not _INLINE_FUNCTION_NAMES:
-        return False
-    cbs = event.get("contentBlockStart", {})
-    start = cbs.get("start", {})
-    tool_use = start.get("toolUse") if isinstance(start, dict) else None
-    return tool_use is not None and tool_use.get("name") in _INLINE_FUNCTION_NAMES
-
 
 
 @app.entrypoint
