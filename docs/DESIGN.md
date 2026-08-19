@@ -30,15 +30,21 @@
 │   │   │   └── di.go                # DIコンテナ（各層の生成・結線）
 │   │   ├── notification/
 │   │   │   └── slack.go             # slack-go ラッパー実装
+│   │   ├── worker_dispatcher.go     # ワーカー用Lambdaへの非同期invoke実装
 │   │   └── chat_agent_repository.go # AgentCoreクライアント実装
 │   ├── interface/
 │   │   └── controller/
-│   │       └── chat_agent.go         # ユースケース呼び出し
+│   │       ├── receiver.go           # 受信用: Verify + Accept呼び出し
+│   │       └── worker.go             # ワーカー用: Exec呼び出し
 │   ├── usecase/
 │   │   ├── chat_agent.go              # Usecaseインターフェース定義
 │   │   └── interactor/
 │   │       └── chat_agent.go          # フロー制御
-│   ├── main.go                        # Lambdaエントリーポイント
+│   ├── cmd/
+│   │   ├── receiver/
+│   │   │   └── main.go                # 受信用Lambdaエントリーポイント
+│   │   └── worker/
+│   │       └── main.go                # ワーカー用Lambdaエントリーポイント
 │   ├── go.mod
 │   └── go.sum
 └── agent/                              # Python: Strandsエージェント（AgentCore CLIで生成）
@@ -66,25 +72,41 @@ type NotificationRepository interface {
     AddReaction(ctx context.Context, target NotificationTarget, reaction string) error
     PostReply(ctx context.Context, target NotificationTarget, message string) error
 }
+
+type WorkerDispatcher interface {
+    Dispatch(ctx context.Context, mention MentionEvent) error
+}
 ```
+
+`WorkerDispatcher`は受信用LambdaからワーカーLambdaへ処理を引き継ぐためのinterface。Lambdaの非同期invokeという実装手段はinfra層の責務であり、domain層はMentionEventを渡す先があることだけを知る。
 
 `sessionID`はAgentCore側のセッション継続に必要な値（後述）。domain層はAgentCore固有の制約（文字数・文字種）を知らなくてよく、渡すのは業務上の識別子（Slackスレッドのタイムスタンプ等）のみ。制約への変換はinfra層の責務。
 
 ### usecase/interactor/chat_agent.go
 
-会話フローを制御する。外部依存はすべてinterfaceで受け取る。
+会話フローを制御する。外部依存はすべてinterfaceで受け取る。SlackのACK要件（3秒以内の応答）とAPI Gatewayのintegration timeout（29秒）に対応するため、受信とAgentCore呼び出しを別々のフローに分ける。
 
-1. `Verify`（`NotificationRepository.Verify` を呼ぶだけ）でSlackリクエストを検証し、challenge / MentionEvent を判別（リトライは`Verify`内で無視される）
-2. 対象チャンネル（`AllowedChannel`）以外なら 「このチャンネルでは回答できません」 と返信して終了
-3. `:reaction:`（`ReactionName`、環境変数で指定）を追加（処理中の目印）
-4. `ChatAgentRepository.Call()` でAgentCoreを呼び出し
-5. Slackにスレッド返信
+**`Accept`**（受信用Lambda向け）
 
-### interface/controller/chat_agent.go
+`WorkerDispatcher.Dispatch()` でMentionEventをワーカー用Lambdaへ非同期に引き継ぐ。
+
+**`Exec`**（ワーカー用Lambda向け）
+
+1. 対象チャンネル（`AllowedChannel`）以外なら 「このチャンネルでは回答できません」 と返信して終了
+2. `:reaction:`（`ReactionName`、環境変数で指定）を追加（処理中の目印）
+3. `ChatAgentRepository.Call()` でAgentCoreを呼び出し
+4. Slackにスレッド返信
+
+### interface/controller/receiver.go
 
 - `Usecase.Verify` の呼び出しとchallenge/Mentionの判別
 - URLVerification challengeへの対応（そのままレスポンスボディとして返す）
-- Mentionがあれば `Usecase.Exec` を呼ぶ
+- Mentionがあれば `Usecase.Accept` を呼ぶ
+
+### interface/controller/worker.go
+
+- 受信用LambdaがDispatchしたペイロード（MentionEvent相当）をパースする
+- `Usecase.Exec` を呼ぶ
 
 ### infra/notification/slack.go
 
@@ -101,6 +123,10 @@ type NotificationRepository interface {
 - **RuntimeUserId（actor_id）**: AgentCore側のセッションは `(RuntimeSessionId, RuntimeUserId)` の組み合わせで一意に決まる（後述）。`RuntimeSessionId`側が既にスレッドごとに一意なので、`RuntimeUserId`は固定値（`"conversation-thread"`）とする。SlackのユーザーIDを使うと、スレッド内でも発言者ごとに会話が分断されるため不可
 - **レスポンス**: `Response`は`io.ReadCloser`で、`text/event-stream`（SSE）形式。`main.py`側はBedrock Converse APIのストリーミングイベントを加工せず転送する仕様のため、Go側で`data: `行をJSONパースし、`event.contentBlockDelta.delta.text`を連結して最終的な応答テキストを組み立てる
 - IAM権限は `bedrock-agentcore:InvokeAgentRuntime` / `InvokeAgentRuntimeForUser`（RuntimeUserIdを使うため） / `GetAgentRuntime` の3つが必要
+
+### infra/worker_dispatcher.go（ワーカーLambda呼び出し）
+
+AWS SDKの`lambda.Invoke`（`InvocationType: Event`）で、ワーカー用Lambdaを非同期に呼び出す。呼び出し先の関数名は環境変数（`WORKER_FUNCTION_NAME`）で受け取る。受信用Lambdaの実行ロールには、ワーカー用Lambdaに対する`lambda:InvokeFunction`権限が必要。
 
 ---
 
@@ -187,7 +213,8 @@ Go と Python は別サービス（`app` / `agent`）に分離する。VS Code�
 | `SLACK_CHANNEL_ID` | 応答するチャンネルID |
 | `SLACK_SIGNING_SECRET` | Slack 署名検証シークレット |
 | `SLACK_REACTION_NAME` | 処理中に追加するリアクション名 |
-| `AGENTCORE_RUNTIME_ARN` | 呼び出し先のAgentCore RuntimeのARN |
+| `WORKER_FUNCTION_NAME` | `ReceiverFunction`が非同期invokeする`WorkerFunction`の関数名（`ReceiverFunction`のみ使用） |
+| `AGENTCORE_RUNTIME_ARN` | 呼び出し先のAgentCore RuntimeのARN（`WorkerFunction`のみ使用） |
 
 ---
 
@@ -199,7 +226,10 @@ Go と Python は別サービス（`app` / `agent`）に分離する。VS Code�
 GitHub push (main) → CodePipeline → CodeBuild (buildspec.yaml) → sam deploy → Lambda
 ```
 
-- `template.yaml`: SAMテンプレート。`ChatAgentFunction`（Lambda）、API Gateway（`ChatAgentApi`、アクセスログ有効）、対応するロググループを定義。Lambda実行ロールには`bedrock-agentcore:InvokeAgentRuntime`・`InvokeAgentRuntimeForUser`・`GetAgentRuntime`を`AgentCoreRuntimeArn`（および`/*`配下）に絞って付与する。
+- `template.yaml`: SAMテンプレート。2つのLambda関数を定義する。
+  - `ReceiverFunction`: API Gateway（`ChatAgentApi`、アクセスログ有効）と統合される受信用Lambda。実行ロールには`WorkerFunction`に対する`lambda:InvokeFunction`権限を付与する。
+  - `WorkerFunction`: `ReceiverFunction`から非同期invokeされるワーカー用Lambda。API Gatewayとは統合しない。実行ロールに`bedrock-agentcore:InvokeAgentRuntime`・`InvokeAgentRuntimeForUser`・`GetAgentRuntime`を`AgentCoreRuntimeArn`（および`/*`配下）に絞って付与する。
+  - 両関数共通で、対応するロググループを定義する。
 - `cfn/template.yaml`: CodePipeline / CodeBuild / IAMロール / アーティファクト用S3バケットを定義するCloudFormationテンプレート。GitHub連携（CodeStarConnections）でmainブランチへのpushをトリガーに自動ビルド・デプロイする。
 - `buildspec.yaml`: CodeBuild内で `sam build` → `sam deploy` を実行。
 - `samconfig.toml`: SAM CLIの環境別設定（`default` / `prod`）。

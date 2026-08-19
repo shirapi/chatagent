@@ -35,3 +35,7 @@ type NotificationRepository interface {
 	AddReaction(ctx context.Context, target NotificationTarget, reaction string) error
 	PostReply(ctx context.Context, target NotificationTarget, message string) error
 }
+
+type WorkerDispatcher interface {
+	Dispatch(ctx context.Context, mention MentionEvent) error
+}

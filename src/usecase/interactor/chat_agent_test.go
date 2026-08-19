@@ -48,6 +48,47 @@ func (m *mockAgentRepo) Call(ctx context.Context, sessionID, message string) (st
 	return m.Reply, m.Err
 }
 
+type mockWorkerDispatcher struct {
+	Err error
+
+	dispatchCalls []domain.MentionEvent
+}
+
+func (m *mockWorkerDispatcher) Dispatch(ctx context.Context, mention domain.MentionEvent) error {
+	m.dispatchCalls = append(m.dispatchCalls, mention)
+	return m.Err
+}
+
+func TestAccept(t *testing.T) {
+	mention := domain.MentionEvent{Channel: "C_ALLOWED", Timestamp: "1.1"}
+
+	tests := []struct {
+		name          string
+		dispatcherErr error
+		wantErr       bool
+	}{
+		{name: "dispatch succeeds", dispatcherErr: nil, wantErr: false},
+		{name: "dispatch fails", dispatcherErr: errors.New("dispatch failed"), wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dispatcher := &mockWorkerDispatcher{Err: tt.dispatcherErr}
+			u := &ChatAgent{
+				WorkerDispatcher: dispatcher,
+			}
+
+			err := u.Accept(context.Background(), mention)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Accept() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if len(dispatcher.dispatchCalls) != 1 || dispatcher.dispatchCalls[0] != mention {
+				t.Errorf("WorkerDispatcher.Dispatch calls = %+v, want [%+v]", dispatcher.dispatchCalls, mention)
+			}
+		})
+	}
+}
+
 func TestExec_ChannelNotAllowed(t *testing.T) {
 	notiRepo := &mockNotificationRepo{}
 	agentRepo := &mockAgentRepo{}

@@ -12,13 +12,20 @@ import (
 type mockUsecase struct {
 	VerifyResult domain.VerifyResult
 	VerifyErr    error
+	AcceptErr    error
 	ExecErr      error
 
-	execCalls []domain.MentionEvent
+	acceptCalls []domain.MentionEvent
+	execCalls   []domain.MentionEvent
 }
 
 func (m *mockUsecase) Verify(r *http.Request) (domain.VerifyResult, error) {
 	return m.VerifyResult, m.VerifyErr
+}
+
+func (m *mockUsecase) Accept(ctx context.Context, mention domain.MentionEvent) error {
+	m.acceptCalls = append(m.acceptCalls, mention)
+	return m.AcceptErr
 }
 
 func (m *mockUsecase) Exec(ctx context.Context, mention domain.MentionEvent) error {
@@ -28,7 +35,7 @@ func (m *mockUsecase) Exec(ctx context.Context, mention domain.MentionEvent) err
 
 func TestExec_VerifyFails(t *testing.T) {
 	uc := &mockUsecase{VerifyErr: errors.New("invalid signature")}
-	c := NewChatAgent("prod", uc)
+	c := NewReceiver("prod", uc)
 
 	res, err := c.Exec(context.Background(), httptest.NewRequest(http.MethodPost, "/", nil))
 	if err != nil {
@@ -37,14 +44,14 @@ func TestExec_VerifyFails(t *testing.T) {
 	if res.StatusCode != http.StatusUnauthorized {
 		t.Errorf("StatusCode = %d, want %d", res.StatusCode, http.StatusUnauthorized)
 	}
-	if len(uc.execCalls) != 0 {
-		t.Errorf("Usecase.Exec should not be called, but was called %d times", len(uc.execCalls))
+	if len(uc.acceptCalls) != 0 {
+		t.Errorf("Usecase.Accept should not be called, but was called %d times", len(uc.acceptCalls))
 	}
 }
 
 func TestExec_Challenge(t *testing.T) {
 	uc := &mockUsecase{VerifyResult: domain.VerifyResult{Challenge: "abc123"}}
-	c := NewChatAgent("prod", uc)
+	c := NewReceiver("prod", uc)
 
 	res, err := c.Exec(context.Background(), httptest.NewRequest(http.MethodPost, "/", nil))
 	if err != nil {
@@ -56,14 +63,14 @@ func TestExec_Challenge(t *testing.T) {
 	if res.Body != "abc123" {
 		t.Errorf("Body = %q, want %q", res.Body, "abc123")
 	}
-	if len(uc.execCalls) != 0 {
-		t.Errorf("Usecase.Exec should not be called, but was called %d times", len(uc.execCalls))
+	if len(uc.acceptCalls) != 0 {
+		t.Errorf("Usecase.Accept should not be called, but was called %d times", len(uc.acceptCalls))
 	}
 }
 
 func TestExec_NoMentionNoChallenge(t *testing.T) {
 	uc := &mockUsecase{VerifyResult: domain.VerifyResult{}}
-	c := NewChatAgent("prod", uc)
+	c := NewReceiver("prod", uc)
 
 	res, err := c.Exec(context.Background(), httptest.NewRequest(http.MethodPost, "/", nil))
 	if err != nil {
@@ -72,8 +79,8 @@ func TestExec_NoMentionNoChallenge(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("StatusCode = %d, want %d", res.StatusCode, http.StatusOK)
 	}
-	if len(uc.execCalls) != 0 {
-		t.Errorf("Usecase.Exec should not be called, but was called %d times", len(uc.execCalls))
+	if len(uc.acceptCalls) != 0 {
+		t.Errorf("Usecase.Accept should not be called, but was called %d times", len(uc.acceptCalls))
 	}
 }
 
@@ -82,20 +89,20 @@ func TestExec_Mention(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		execErr    error
+		acceptErr  error
 		wantStatus int
 	}{
-		{name: "usecase succeeds", execErr: nil, wantStatus: http.StatusOK},
-		{name: "usecase fails", execErr: errors.New("boom"), wantStatus: http.StatusInternalServerError},
+		{name: "usecase succeeds", acceptErr: nil, wantStatus: http.StatusOK},
+		{name: "usecase fails", acceptErr: errors.New("boom"), wantStatus: http.StatusInternalServerError},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			uc := &mockUsecase{
 				VerifyResult: domain.VerifyResult{Mention: &mention},
-				ExecErr:      tt.execErr,
+				AcceptErr:    tt.acceptErr,
 			}
-			c := NewChatAgent("prod", uc)
+			c := NewReceiver("prod", uc)
 
 			res, err := c.Exec(context.Background(), httptest.NewRequest(http.MethodPost, "/", nil))
 			if err != nil {
@@ -104,8 +111,8 @@ func TestExec_Mention(t *testing.T) {
 			if res.StatusCode != tt.wantStatus {
 				t.Errorf("StatusCode = %d, want %d", res.StatusCode, tt.wantStatus)
 			}
-			if len(uc.execCalls) != 1 || uc.execCalls[0] != mention {
-				t.Errorf("Usecase.Exec calls = %+v, want [%+v]", uc.execCalls, mention)
+			if len(uc.acceptCalls) != 1 || uc.acceptCalls[0] != mention {
+				t.Errorf("Usecase.Accept calls = %+v, want [%+v]", uc.acceptCalls, mention)
 			}
 		})
 	}
