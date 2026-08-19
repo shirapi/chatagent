@@ -30,3 +30,7 @@ func GetSlackReactionName() string {
 func GetAgentCoreRuntimeArn() string {
 	return os.Getenv("AGENTCORE_RUNTIME_ARN")
 }
+
+func GetWorkerFunctionName() string {
+	return os.Getenv("WORKER_FUNCTION_NAME")
+}

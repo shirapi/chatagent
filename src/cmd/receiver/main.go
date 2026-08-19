@@ -14,9 +14,9 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	ctrl, err := di.NewController(ctx)
+	ctrl, err := di.NewReceiver(ctx)
 	if err != nil {
-		slog.Error("NewController", "err", err)
+		slog.Error("NewReceiver", "err", err)
 		return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, nil
 	}
 

@@ -11,14 +11,16 @@ import (
 type ChatAgent struct {
 	AgentRepo        domain.ChatAgentRepository
 	NotificationRepo domain.NotificationRepository
+	WorkerDispatcher domain.WorkerDispatcher
 	AllowedChannel   string
 	ReactionName     string
 }
 
-func NewChatAgent(agentRepo domain.ChatAgentRepository, notiRepo domain.NotificationRepository, allowedChannel, reactionName string) usecase.ChatAgent {
+func NewChatAgent(agentRepo domain.ChatAgentRepository, notiRepo domain.NotificationRepository, workerDispatcher domain.WorkerDispatcher, allowedChannel, reactionName string) usecase.ChatAgent {
 	return &ChatAgent{
 		AgentRepo:        agentRepo,
 		NotificationRepo: notiRepo,
+		WorkerDispatcher: workerDispatcher,
 		AllowedChannel:   allowedChannel,
 		ReactionName:     reactionName,
 	}
@@ -26,6 +28,10 @@ func NewChatAgent(agentRepo domain.ChatAgentRepository, notiRepo domain.Notifica
 
 func (u *ChatAgent) Verify(r *http.Request) (domain.VerifyResult, error) {
 	return u.NotificationRepo.Verify(r)
+}
+
+func (u *ChatAgent) Accept(ctx context.Context, mention domain.MentionEvent) error {
+	return u.WorkerDispatcher.Dispatch(ctx, mention)
 }
 
 func (u *ChatAgent) Exec(ctx context.Context, mention domain.MentionEvent) error {

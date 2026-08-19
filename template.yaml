@@ -85,19 +85,61 @@ Resources:
       LogGroupName: /aws/apigateway/chatagent
       RetentionInDays: 3
 
-  # Lambda Function
-  ChatAgentFunction:
+  # Lambda Functions
+  ReceiverFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Metadata:
       BuildMethod: go1.x
     Properties:
-      FunctionName: chatagent-ChatAgentFunction
-      CodeUri: ./src/
+      FunctionName: chatagent-ReceiverFunction
+      CodeUri: ./src/cmd/receiver/
       Handler: bootstrap
       Runtime: provided.al2023
       Architectures:
       - x86_64
       Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
+        Variables:
+         APP_ENV: !Ref Env
+         SLACK_OAUTH_TOKEN: !Ref SlackOAuthToken
+         SLACK_CHANNEL_ID: !Ref SlackChannelID
+         SLACK_SIGNING_SECRET: !Ref SlackSigningSecret
+         SLACK_REACTION_NAME: !Ref SlackReactionName
+         WORKER_FUNCTION_NAME: !Ref WorkerFunction
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource:
+                - !GetAtt WorkerFunction.Arn
+      Events:
+        SlackEvents:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ChatAgentApi
+            Path: /slack/events
+            Method: post
+
+  ReceiverFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ReceiverFunction}
+      RetentionInDays: 3
+
+  WorkerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      FunctionName: chatagent-WorkerFunction
+      CodeUri: ./src/cmd/worker/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+      - x86_64
+      Environment:
         Variables:
          APP_ENV: !Ref Env
          SLACK_OAUTH_TOKEN: !Ref SlackOAuthToken
@@ -115,18 +157,11 @@ Resources:
               Resource:
                 - !Ref AgentCoreRuntimeArn
                 - !Sub "${AgentCoreRuntimeArn}/*"
-      Events:
-        SlackEvents:
-          Type: Api
-          Properties:
-            RestApiId: !Ref ChatAgentApi
-            Path: /slack/events
-            Method: post
 
-  ChatAgentFunctionLogGroup:
+  WorkerFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      LogGroupName: !Sub /aws/lambda/${ChatAgentFunction}
+      LogGroupName: !Sub /aws/lambda/${WorkerFunction}
       RetentionInDays: 3
