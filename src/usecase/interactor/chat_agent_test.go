@@ -89,77 +89,105 @@ func TestAccept(t *testing.T) {
 	}
 }
 
-func TestExec_ChannelNotAllowed(t *testing.T) {
-	notiRepo := &mockNotificationRepo{}
-	agentRepo := &mockAgentRepo{}
-	u := &ChatAgent{
-		AgentRepo:        agentRepo,
-		NotificationRepo: notiRepo,
-		AllowedChannel:   "C_ALLOWED",
-		ReactionName:     "eyes",
+func TestExec_Failures(t *testing.T) {
+	tests := []struct {
+		name                 string
+		channel              string
+		addReactionErr       error
+		agentErr             error
+		postReplyErr         error
+		wantAddReactionCalls int
+		wantAgentCallCalls   int
+		wantMessage          string
+		wantErr              bool
+	}{
+		{
+			// 正常系:チャンネル不一致
+			name: "channel not allowed", channel: "C_OTHER",
+			wantMessage: domain.MessageInvalidChannel, wantErr: false,
+		},
+		{
+			// 異常系:チャンネル不一致 -> 返信失敗
+			name: "channel not allowed and notify fails", channel: "C_OTHER",
+			postReplyErr: errors.New("post reply failed"),
+			wantErr:      true,
+		},
+		{
+			// 正常系:リアクション失敗
+			name: "add reaction fails", channel: "C_ALLOWED",
+			addReactionErr:       errors.New("add reaction failed"),
+			wantAddReactionCalls: 1, wantMessage: domain.MessageProcessingFailed, wantErr: false,
+		},
+		{
+			// 異常系:リアクション失敗 -> 返信失敗
+			name: "add reaction fails and notify also fails", channel: "C_ALLOWED",
+			addReactionErr: errors.New("add reaction failed"), postReplyErr: errors.New("post reply failed"),
+			wantAddReactionCalls: 1, wantErr: true,
+		},
+		{
+			// 正常系:エージェント呼び出し失敗
+			name: "agent call fails", channel: "C_ALLOWED",
+			agentErr:             errors.New("agent call failed"),
+			wantAddReactionCalls: 1, wantAgentCallCalls: 1, wantMessage: domain.MessageProcessingFailed, wantErr: false,
+		},
+		{
+			// 異常系:エージェント呼び出し失敗 -> 返信失敗
+			name: "agent call fails and notify also fails", channel: "C_ALLOWED",
+			agentErr: errors.New("agent call failed"), postReplyErr: errors.New("post reply failed"),
+			wantAddReactionCalls: 1, wantAgentCallCalls: 1, wantErr: true,
+		},
 	}
 
-	err := u.Exec(context.Background(), domain.MentionEvent{Channel: "C_OTHER", Timestamp: "1.1"})
-	if err != nil {
-		t.Fatalf("Exec() unexpected error: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			notiRepo := &mockNotificationRepo{
+				AddReactionErr: tt.addReactionErr,
+				PostReplyErr:   tt.postReplyErr,
+			}
+			agentRepo := &mockAgentRepo{Err: tt.agentErr}
+			u := &ChatAgent{
+				AgentRepo:        agentRepo,
+				NotificationRepo: notiRepo,
+				AllowedChannel:   "C_ALLOWED",
+				ReactionName:     "eyes",
+			}
 
-	if len(notiRepo.postReplyCalls) != 1 {
-		t.Fatalf("PostReply call count = %d, want 1", len(notiRepo.postReplyCalls))
-	}
-	if got := notiRepo.postReplyCalls[0].Message; got != domain.MessageInvalidChannel {
-		t.Errorf("PostReply message = %q, want %q", got, domain.MessageInvalidChannel)
-	}
-	if len(notiRepo.addReactionCalls) != 0 {
-		t.Errorf("AddReaction should not be called, but was called %d times", len(notiRepo.addReactionCalls))
-	}
-	if len(agentRepo.callSessionIDs) != 0 {
-		t.Errorf("AgentRepo.Call should not be called, but was called %d times", len(agentRepo.callSessionIDs))
-	}
-}
+			err := u.Exec(context.Background(), domain.MentionEvent{Channel: tt.channel, Timestamp: "1.1"})
 
-func TestExec_AddReactionFails(t *testing.T) {
-	wantErr := errors.New("add reaction failed")
-	notiRepo := &mockNotificationRepo{AddReactionErr: wantErr}
-	agentRepo := &mockAgentRepo{}
-	u := &ChatAgent{
-		AgentRepo:        agentRepo,
-		NotificationRepo: notiRepo,
-		AllowedChannel:   "C_ALLOWED",
-		ReactionName:     "eyes",
-	}
+			if len(notiRepo.addReactionCalls) != tt.wantAddReactionCalls {
+				t.Errorf("AddReaction call count = %d, want %d", len(notiRepo.addReactionCalls), tt.wantAddReactionCalls)
+			}
+			if len(agentRepo.callSessionIDs) != tt.wantAgentCallCalls {
+				t.Errorf("AgentRepo.Call call count = %d, want %d", len(agentRepo.callSessionIDs), tt.wantAgentCallCalls)
+			}
 
-	err := u.Exec(context.Background(), domain.MentionEvent{Channel: "C_ALLOWED", Timestamp: "1.1"})
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("Exec() error = %v, want %v", err, wantErr)
-	}
-	if len(agentRepo.callSessionIDs) != 0 {
-		t.Errorf("AgentRepo.Call should not be called, but was called %d times", len(agentRepo.callSessionIDs))
-	}
-}
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("Exec() expected an error, got nil")
+				}
+				if tt.postReplyErr != nil && !errors.Is(err, tt.postReplyErr) {
+					t.Errorf("Exec() error = %v, want it to wrap %v", err, tt.postReplyErr)
+				}
+				cause := tt.addReactionErr
+				if cause == nil {
+					cause = tt.agentErr
+				}
+				if cause != nil && !errors.Is(err, cause) {
+					t.Errorf("Exec() error = %v, want it to wrap %v", err, cause)
+				}
+				return
+			}
 
-func TestExec_AgentCallFails(t *testing.T) {
-	wantErr := errors.New("agent call failed")
-	notiRepo := &mockNotificationRepo{}
-	agentRepo := &mockAgentRepo{Err: wantErr}
-	u := &ChatAgent{
-		AgentRepo:        agentRepo,
-		NotificationRepo: notiRepo,
-		AllowedChannel:   "C_ALLOWED",
-		ReactionName:     "eyes",
-	}
-
-	err := u.Exec(context.Background(), domain.MentionEvent{Channel: "C_ALLOWED", Timestamp: "1.1"})
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("Exec() error = %v, want %v", err, wantErr)
-	}
-	// AddReaction should still have been called before the failure.
-	if len(notiRepo.addReactionCalls) != 1 {
-		t.Errorf("AddReaction call count = %d, want 1", len(notiRepo.addReactionCalls))
-	}
-	// PostReply should not be called since Call failed.
-	if len(notiRepo.postReplyCalls) != 0 {
-		t.Errorf("PostReply should not be called, but was called %d times", len(notiRepo.postReplyCalls))
+			if err != nil {
+				t.Fatalf("Exec() unexpected error: %v", err)
+			}
+			if len(notiRepo.postReplyCalls) != 1 {
+				t.Fatalf("PostReply call count = %d, want 1", len(notiRepo.postReplyCalls))
+			}
+			if got := notiRepo.postReplyCalls[0].Message; got != tt.wantMessage {
+				t.Errorf("PostReply message = %q, want %q", got, tt.wantMessage)
+			}
+		})
 	}
 }
 
@@ -167,16 +195,29 @@ func TestExec_Success(t *testing.T) {
 	tests := []struct {
 		name            string
 		threadTimestamp string
+		agentReply      string
 		wantSessionID   string
+		wantMessage     string
 	}{
-		{name: "uses ThreadTimestamp when present", threadTimestamp: "1.0", wantSessionID: "1.0"},
-		{name: "falls back to Timestamp when ThreadTimestamp is empty", threadTimestamp: "", wantSessionID: "1.1"},
+		{
+			name: "uses ThreadTimestamp when present", threadTimestamp: "1.0", agentReply: "hello!",
+			wantSessionID: "1.0", wantMessage: "hello!",
+		},
+		{
+			name: "falls back to Timestamp when ThreadTimestamp is empty", threadTimestamp: "", agentReply: "hello!",
+			wantSessionID: "1.1", wantMessage: "hello!",
+		},
+		{
+			// AgentCoreのストリームからテキストを1件も抽出できなかった場合、空メッセージではなく代替文言を返信する。
+			name: "substitutes a message when the agent reply is empty", threadTimestamp: "1.0", agentReply: "",
+			wantSessionID: "1.0", wantMessage: domain.MessageNoResponse,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			notiRepo := &mockNotificationRepo{}
-			agentRepo := &mockAgentRepo{Reply: "hello!"}
+			agentRepo := &mockAgentRepo{Reply: tt.agentReply}
 			u := &ChatAgent{
 				AgentRepo:        agentRepo,
 				NotificationRepo: notiRepo,
@@ -199,8 +240,8 @@ func TestExec_Success(t *testing.T) {
 			if len(notiRepo.postReplyCalls) != 1 {
 				t.Fatalf("PostReply call count = %d, want 1", len(notiRepo.postReplyCalls))
 			}
-			if got := notiRepo.postReplyCalls[0].Message; got != "hello!" {
-				t.Errorf("PostReply message = %q, want %q", got, "hello!")
+			if got := notiRepo.postReplyCalls[0].Message; got != tt.wantMessage {
+				t.Errorf("PostReply message = %q, want %q", got, tt.wantMessage)
 			}
 		})
 	}

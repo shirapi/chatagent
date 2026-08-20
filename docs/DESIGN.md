@@ -97,6 +97,10 @@ type WorkerDispatcher interface {
 3. `ChatAgentRepository.Call()` でAgentCoreを呼び出し
 4. Slackにスレッド返信
 
+`AddReaction`・`ChatAgentRepository.Call()`が失敗した場合、その旨のメッセージ（`domain.MessageProcessingFailed`）をSlackに返信し、`Exec`はエラーを返さない（`nil`を返す）。`WorkerFunction`はLambdaの非同期invoke経由で呼ばれ、エラーを返すとLambdaが自動的にリトライするため、エラーメッセージをSlackに送った後もエラーを返し続けると、リトライのたびに重複してエラーメッセージやリアクションが投稿される。会話としての即時性を優先し、自動リトライによる復旧の機会よりも、リトライを止めて重複通知を避けることを選ぶ。
+
+`ChatAgentRepository.Call()`が空文字を返した場合（ストリームから応答テキストを1件も抽出できなかった場合）、そのまま返信すると`<@user> `だけの空メッセージになるため、`domain.MessageNoResponse`に差し替えてから返信する。
+
 ### interface/controller/receiver.go
 
 - `Usecase.Verify` の呼び出しとchallenge/Mentionの判別
@@ -153,6 +157,7 @@ AgentCore Runtimeのセッションは `(RuntimeSessionId, RuntimeUserId)` の�
 - 履歴の保持先は2段階ある。プロセス内キャッシュ（コンテナが生きている間のみ有効）と、AgentCore Memory（`agentcore create --memory shortTerm` で作成、`eventExpiryDuration: 30`で30日間永続化、コンテナが再起動しても復元される）
 - MemoryリソースはCDKによりRuntimeへ自動的に紐付けられ、`MEMORY_CHATAGENTMEMORY_ID` 環境変数が自動注入される（手動配線は不要）
 - Slackのスレッドは15分以上空くこともあり得るため、プロセス内キャッシュだけでは不十分。AgentCore Memoryを使う前提とする
+- `main.py`の`invoke`は`context.session_id`/`context.user_id`が取得できない場合、`'default-session'`/`'default-user'`という固定値にフォールバックする。呼び出し元はGoのLambda（`WorkerFunction`）のみであり、`RuntimeSessionId`/`RuntimeUserId`は常に明示的に渡されるため、このフォールバックは実行されない想定。他の呼び出し経路を追加しない限り対応不要と判断する
 
 ---
 

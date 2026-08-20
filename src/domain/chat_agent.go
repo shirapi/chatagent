@@ -28,7 +28,11 @@ type VerifyResult struct {
 	Mention   *MentionEvent
 }
 
-const MessageInvalidChannel = "このチャンネルでは回答できません"
+const (
+	MessageInvalidChannel   = "このチャンネルでは回答できません"
+	MessageProcessingFailed = "エラーが発生しました。しばらくしてから再度お試しください"
+	MessageNoResponse       = "応答がありません"
+)
 
 type NotificationRepository interface {
 	Verify(r *http.Request) (VerifyResult, error)
