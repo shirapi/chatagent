@@ -38,9 +38,9 @@ Parameters:
     Description: Reaction name to add while processing
     Default: "eyes"
   AgentCoreRuntimeArn:
-    Type: String
+    Type: AWS::SSM::Parameter::Value<String>
     Description: Bedrock AgentCore Runtime ARN to invoke
-    Default: ""
+    Default: /chatagent/AgentCoreRuntimeArn
 
 Resources:
   # API Gateway
