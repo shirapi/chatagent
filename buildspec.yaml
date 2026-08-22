@@ -3,7 +3,7 @@ version: 0.2
 env:
   parameter-store:
     SLACK_OAUTH_TOKEN: /chatagent/SlackOAuthToken
-    SLACK_CHANNEL_ID: /chatagent/SlackChannelID
+    SLACK_CHANNEL_ID: /chatagent/SlackChannelId
     SLACK_SIGNING_SECRET: /chatagent/SlackSigningSecret
     SLACK_REACTION_NAME: /chatagent/SlackReactionName
 

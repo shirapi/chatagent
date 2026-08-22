@@ -159,6 +159,15 @@ Resources:
                 Effect: Allow
                 Action:
                   - codestar-connections:UseConnection
+              # パイプラインのアーティファクト受け渡し用（Source/Buildステージ間）
+              - Resource:
+                  - !GetAtt S3BucketArticactStore.Arn
+                  - !Sub "${S3BucketArticactStore.Arn}/*"
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
 
   CodeBuildServiceRole:
     Type: AWS::IAM::Role
@@ -185,6 +194,12 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
+              # buildspec.yamlのenv.parameter-storeが読むSSMパラメータ
+              - Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/chatagent/*"
+                Effect: Allow
+                Action:
+                  - ssm:GetParameters
               # sam deployが操作するCloudFormationスタック（stack_name: chatagent）
               - Resource:
                   - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/chatagent/*"
@@ -243,7 +258,7 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     Properties:
-      BucketName: !Sub Chatagent-codepipeline-${AWS::AccountId}
+      BucketName: !Sub chatagent-codepipeline-${AWS::AccountId}
 
   # AWS Chatbotが未構築のため、いったんコメントアウト
   # ChatAgentNotificationRule:
