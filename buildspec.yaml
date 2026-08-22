@@ -24,4 +24,4 @@ phases:
   post_build:
     commands:
       - echo "Post-build phase"
-      - sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --config-env $ENV --parameter-overrides SlackOAuthToken=${SLACK_OAUTH_TOKEN} SlackChannelID=${SLACK_CHANNEL_ID} SlackSigningSecret=${SLACK_SIGNING_SECRET} SlackReactionName=${SLACK_REACTION_NAME}
+      - sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --config-env ${Env} --parameter-overrides Env=${Env} SlackOAuthToken=${SLACK_OAUTH_TOKEN} SlackChannelID=${SLACK_CHANNEL_ID} SlackSigningSecret=${SLACK_SIGNING_SECRET} SlackReactionName=${SLACK_REACTION_NAME}
