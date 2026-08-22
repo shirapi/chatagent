@@ -200,9 +200,11 @@ Resources:
                 Effect: Allow
                 Action:
                   - ssm:GetParameters
-              # sam deployが操作するCloudFormationスタック（stack_name: chatagent）
+              # sam deployが操作するCloudFormationスタック（stack_name: chatagent）と、
+              # resolve_s3=trueによりSAMが自動作成する管理用スタック
               - Resource:
                   - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/chatagent/*"
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/aws-sam-cli-managed-default/*"
                 Effect: Allow
                 Action:
                   - cloudformation:*

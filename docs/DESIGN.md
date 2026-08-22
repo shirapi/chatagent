@@ -259,8 +259,9 @@ GitHub push (main) → CodePipeline → CodeBuild (buildspec.yaml) → sam deplo
 
 `agent/`（AgentCore）と`src/`（Go/SAM）は別々にデプロイされる。  
 GoのLambdaは`AgentCoreRuntimeArn`パラメータでAgentCore RuntimeのARNを必要とするため、SSM Parameter Store（`/chatagent/AgentCoreRuntimeArn`）経由で受け渡す。  
-`template.yaml`の`AgentCoreRuntimeArn`パラメータ型は`AWS::SSM::Parameter::Value<String>`とし、SAMデプロイ時にSSMから自動解決する。  
-ARN自体は`agentcore deploy`後、`agentcore/.cli/deployed-state.json`から抽出して`aws ssm put-parameter`でSSM Parameter Storeに書き込む。
+`AgentCoreRuntimeArn`パラメータ（`String`型）は、`buildspec.yaml`（`env.parameter-store`）がSSMから値を取得して`sam deploy --parameter-overrides`で渡す（Slack関連の他のパラメータと同じ方式）。  
+ARN自体は`agentcore deploy`後、`agentcore/.cli/deployed-state.json`から抽出して`aws ssm put-parameter`でSSM Parameter Storeに書き込む。  
+※`AWS::SSM::Parameter::Value<String>`型でのSAM自動解決も検討したが、SAMの`Policies`内で`Fn::Sub`と組み合わせた際にCloudFormationがSSMへの参照解決に失敗する事象が発生したため不採用とした。  
 ※Step Functions等の大掛かりなオーケストレーションは使わない（CodeBuildのシェルコマンド + SSMの疎結合で十分なため）。
 
 ### Slack Events APIについての注意
