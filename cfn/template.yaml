@@ -201,10 +201,12 @@ Resources:
                 Action:
                   - ssm:GetParameters
               # sam deployが操作するCloudFormationスタック（stack_name: chatagent）と、
-              # resolve_s3=trueによりSAMが自動作成する管理用スタック
+              # resolve_s3=trueによりSAMが自動作成する管理用スタック、
+              # SAMテンプレートのTransform（AWS::Serverless-2016-10-31）
               - Resource:
                   - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/chatagent/*"
                   - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/aws-sam-cli-managed-default/*"
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31"
                 Effect: Allow
                 Action:
                   - cloudformation:*
