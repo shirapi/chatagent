@@ -13,7 +13,3 @@
 ### Other ###
 settings.local.json
 deploy_*.zsh
-
-### Tmp ###
-cfn/*
-buildspec.yaml

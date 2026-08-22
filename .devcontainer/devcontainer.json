@@ -8,7 +8,7 @@
     "customizations": {
         "vscode": {
             "settings": {
-                "go.toolsManagement.checkForUodates": "off",
+                "go.toolsManagement.checkForUpdates": "off",
                 "go.gopath": "/go",
                 "go.gocodeAutoBuild": true,
                 "go.formatTool": "goimports",

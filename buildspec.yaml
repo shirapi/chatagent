@@ -1,0 +1,28 @@
+version: 0.2
+
+env:
+  parameter-store:
+    SLACK_OAUTH_TOKEN: /chatagent/SlackOAuthToken
+    SLACK_CHANNEL_ID: /chatagent/SlackChannelId
+    SLACK_SIGNING_SECRET: /chatagent/SlackSigningSecret
+    SLACK_REACTION_NAME: /chatagent/SlackReactionName
+    AGENTCORE_RUNTIME_ARN: /chatagent/AgentCoreRuntimeArn
+
+phases:
+  install:
+    runtime-versions:
+      golang: 1.26
+
+  pre_build:
+    commands:
+      - echo "Pre-build phase"
+
+  build:
+    commands:
+      - echo "Build phase"
+      - sam build
+
+  post_build:
+    commands:
+      - echo "Post-build phase"
+      - sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --config-env ${Env} --parameter-overrides Env=${Env} SlackOAuthToken=${SLACK_OAUTH_TOKEN} SlackChannelID=${SLACK_CHANNEL_ID} SlackSigningSecret=${SLACK_SIGNING_SECRET} SlackReactionName=${SLACK_REACTION_NAME} AgentCoreRuntimeArn=${AGENTCORE_RUNTIME_ARN}

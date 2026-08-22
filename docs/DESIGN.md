@@ -239,7 +239,11 @@ GitHub push (main) → CodePipeline → CodeBuild (buildspec.yaml) → sam deplo
 - `buildspec.yaml`: CodeBuild内で `sam build` → `sam deploy` を実行。
 - `samconfig.toml`: SAM CLIの環境別設定（`default` / `prod`）。
 - `deploy.zsh`: ローカル環境から手動で `sam deploy` する際の補助スクリプト（Slackトークン等を対話入力）。
-- `agent/deploy.zsh`: ローカル環境から手動で `agentcore deploy` する際の補助スクリプト。
+- `agent/deploy.zsh`: ローカル環境から手動で `agentcore deploy` する際の補助スクリプト。デプロイ後、`agentcore/.cli/deployed-state.json`からAgentCore RuntimeのARNを抽出し、`aws ssm put-parameter`でSSM Parameter Store（`/chatagent/AgentCoreRuntimeArn`）へ書き込む。
+
+`agent/`側はCI/CD化していない。
+※AWSアカウントID等の具体的な値を含む一部のファイルをgit管理する必要があるため。
+(本来はprivateリポジトリにして管理対象とすべき: `.cli/deployed-state.json`, `.cli/aws-targets.json`)
 
 ### AgentCoreデプロイ時のIAM権限
 
@@ -251,13 +255,14 @@ GitHub push (main) → CodePipeline → CodeBuild (buildspec.yaml) → sam deplo
 
 `agent/agentcore/cdk/lib/cdk-stack.ts`は`agentcore create`が生成するファイル。RuntimeロールへのSSM読み取り権限（`ssm:GetParameter`、`/chatagent/AgentCharacter`・`/chatagent/AgentModelId`）は`agentcore add`等のCLIサブコマンドでは対応できない範囲のため、直接編集して追加する。CLI生成部分と区別できるよう、編集箇所は`BEGIN CUSTOM`/`END CUSTOM`のマーカーで囲む。
 
-### AgentCore Runtime ARNの受け渡し（今後の方針）
+### AgentCore Runtime ARNの受け渡し
 
-`agent/`（AgentCore）と`src/`（Go/SAM）は別々にデプロイされるが、GoのLambdaは`AgentCoreRuntimeArn`パラメータでAgentCore RuntimeのARNを必要とする。CI/CDで自動化する際は以下の方針とする（slackbot_goでもCodeBuild側でSSMから値を読んでいた前例に倣う）。
-
-- `agentcore deploy`後、`agentcore/.cli/deployed-state.json`からARNを抽出し、`aws ssm put-parameter`でSSM Parameter Storeに書き込む
-- `template.yaml`の`AgentCoreRuntimeArn`パラメータ型を`AWS::SSM::Parameter::Value<String>`にし、SAMデプロイ時にSSMから自動解決させる
-- Step Functions等の大掛かりなオーケストレーションは使わない（CodeBuildのシェルコマンド + SSMの疎結合で十分なため）
+`agent/`（AgentCore）と`src/`（Go/SAM）は別々にデプロイされる。  
+GoのLambdaは`AgentCoreRuntimeArn`パラメータでAgentCore RuntimeのARNを必要とするため、SSM Parameter Store（`/chatagent/AgentCoreRuntimeArn`）経由で受け渡す。  
+`AgentCoreRuntimeArn`パラメータ（`String`型）は、`buildspec.yaml`（`env.parameter-store`）がSSMから値を取得して`sam deploy --parameter-overrides`で渡す（Slack関連の他のパラメータと同じ方式）。  
+ARN自体は`agentcore deploy`後、`agentcore/.cli/deployed-state.json`から抽出して`aws ssm put-parameter`でSSM Parameter Storeに書き込む。  
+※`AWS::SSM::Parameter::Value<String>`型でのSAM自動解決も検討したが、SAMの`Policies`内で`Fn::Sub`と組み合わせた際にCloudFormationがSSMへの参照解決に失敗する事象が発生したため不採用とした。  
+※Step Functions等の大掛かりなオーケストレーションは使わない（CodeBuildのシェルコマンド + SSMの疎結合で十分なため）。
 
 ### Slack Events APIについての注意
 

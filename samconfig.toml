@@ -24,10 +24,8 @@ warm_containers = "EAGER"
 [prod]
 [prod.deploy]
 [prod.deploy.parameters]
+stack_name = "chatagent"
 region ="ap-northeast-1"
-parameter_overrides = [
-    "Env=prod"
-]
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
